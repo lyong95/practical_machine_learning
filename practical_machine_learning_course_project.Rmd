@@ -1,0 +1,92 @@
+---
+title: "Prediction_assignment"
+author: "Luoyan Yong"
+date: "3/30/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(dplyr)
+library(caret)
+```
+
+## Synopsis
+A prediction model is built to predict how well an exercise is performed based on
+data collected from accelerometers on the belt, forearm, arm, and dumbell of 6 participants, Each participant completed an exercise in 5 different ways both correctly
+and incorrectly.
+
+```{r}
+training = read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv")
+
+testing = read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv")
+
+```
+
+### check for missing values
+```{r}
+n = c()
+for(i in 1: ncol(training)){
+  n = c(n, length(which(is.na(training[,i])==TRUE)))
+}
+
+sum_na = data.frame(col =colnames(training), num_NAs = n)
+sum_na = sum_na[sum_na$num_NAs>0, ]
+
+```
+
+### remove missing values in training set
+```{r}
+n2 = c()
+for(i in 1: ncol(testing)){
+  n2 = c(n2, length(which(is.na(testing[,i])==TRUE)))
+}
+
+sum_na2 = data.frame(col = colnames(testing), num_NAs = n2)
+sum_na2 = sum_na2[sum_na2$num_NAs>0, ]
+
+```
+
+### check if the columns in both traning and testing set match 
+```{r}
+training = training[, -which(colnames(training) %in% sum_na$col)]
+testing = testing[, -which(colnames(testing) %in% sum_na2$col)]
+training = data.frame(classe = training$classe, 
+                      training[, which(colnames(training) %in%  colnames(testing))])
+
+#remove columns that are irrelevant for building the model (e.g. names and dates)
+testing = testing[, -c(1:7)]
+training = training[, -c(2:8)]
+
+```
+
+
+## train model 
+```{r}
+#  split training set into training and validation 
+inTrain <- createDataPartition(y=training$classe, p=0.7, list=F)
+train <- training[inTrain,]
+valid <- training[-inTrain,]
+
+train_control<- trainControl(method="cv", number=10, savePredictions = TRUE)
+mod = caret::train(classe ~., data = train, trControl = train_control, method="rf")
+
+plot(mod)
+```
+
+## validate the model with validation set
+To validate the model, we apply our it to the validation set and build a confusion matrix which will tell us the accuracy of our model.
+```{r}
+pv = predict(mod, valid)
+confusionMatrix(pv, valid$classe)
+
+```
+
+Since the model has high accuracy and only a out of sample error of 0.0073, we can be confident in using this model to predict our test set.
+
+## predict test set
+```{r}
+predict(mod, testing)
+
+```
